@@ -6,10 +6,20 @@
 # A few utility functions to make it easy and re-usable to draw segmented prompts
 
 CURRENT_BG='NONE'
-SEGMENT_SEPARATOR=''
 SSH_BG=green
 PRIMARY_FG=black
 
+# Characters
+SEGMENT_SEPARATOR="\ue0b0"  # 
+PLUSMINUS="\u00b1"          # ±
+BRANCH="\ue0a0"             # 
+DETACHED="\u27a6"           # ➦
+#CROSS="\u2718"              # ✘
+CROSS="\u274C"              # ❌
+LIGHTNING="\u26a1"          # ⚡
+GEAR="\u2699"               # ⚙
+ARROW="\u2197"              # ↗
+STAR="\u2217"               # ∗
 
 # Begin a segment
 # Takes two arguments, background and foreground. Both can be omitted,
@@ -52,46 +62,52 @@ prompt_context() {
 
 # Git: branch/detached head, dirty status
 prompt_git() {
-  local ref dirty
+  local color ref dirty
   if $(git rev-parse --is-inside-work-tree 2> /dev/null); then
     if [[ -n $(git status -s --ignore-submodules=dirty 2> /dev/null) ]]; then
-      prompt_segment yellow black
+      color=yellow
     else
-      prompt_segment green black
+      color=green
     fi
 
-    git diff --no-ext-diff --ignore-submodules --quiet --exit-code || dirty='∗'
+    git diff --no-ext-diff --ignore-submodules --quiet --exit-code || dirty="$STAR"
 
-    ref=$(git symbolic-ref HEAD 2> /dev/null) || ref="➦ $(git show-ref --head -s --abbrev | head -n1 2> /dev/null)"
+    ref=$(git symbolic-ref HEAD 2> /dev/null) || ref="$DETACHED $(git show-ref --head -s --abbrev | head -n1 2> /dev/null)"
 
     if git rev-parse --quiet --verify HEAD >/dev/null; then
-      git diff-index --cached --quiet --ignore-submodules HEAD -- || index='±'
+      git diff-index --cached --quiet --ignore-submodules HEAD -- || index="$PLUSMINUS"
     else
       index="#"
     fi
 
     if $(git status -b --porcelain | grep '\[ahead' &> /dev/null); then
-      push='↗'
+      push="$ARROW"
     fi
 
+    prompt_segment $color $PRIMARY_FG
     echo -n "${ref/refs\/heads\//}${dirty}${index}${push}"
   fi
 }
 
+# Dir: current working directory
 prompt_dir() {
-  prompt_segment blue black '%~'
+  prompt_segment blue $PRIMARY_FG '%~'
 }
 
+# Status:
+# - was there an error
+# - am I root
+# - are there background jobs?
 prompt_status() {
   local symbols
   symbols=()
-  [[ $(jobs -l | wc -l) -gt 0 ]] && symbols+="%{%F{cyan}%}⚙"
+  [[ $(jobs -l | wc -l) -gt 0 ]] && symbols+="%{%F{cyan}%}$GEAR"
 
-  [[ -n "$symbols" ]] && prompt_segment black default "$symbols"
+  [[ -n "$symbols" ]] && prompt_segment $PRIMARY_FG default "$symbols"
 }
 
 prompt_vi_mode() {
-  [[ "$KEYMAP" == "vicmd" ]] && prompt_segment magenta default "❌"
+  [[ "$KEYMAP" == "vicmd" ]] && prompt_segment cyan $PRIMARY_FG "$CROSS"
 }
 
 prompt_agnoster_setup () {

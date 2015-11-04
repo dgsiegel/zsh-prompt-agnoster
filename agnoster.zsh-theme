@@ -1,32 +1,12 @@
 # vim:ft=zsh ts=2 sw=2 sts=2
 #
-# agnoster's Theme - https://gist.github.com/3712874
-# A Powerline-inspired theme for ZSH
-#
-# # README
-#
-# In order for this theme to render correctly, you will need a
-# [Powerline-patched font](https://gist.github.com/1595572).
-#
-# In addition, I recommend the
-# [Solarized theme](https://github.com/altercation/solarized/) and, if you're
-# using it on Mac OS X, [iTerm 2](http://www.iterm2.com/) over Terminal.app -
-# it has significantly better color fidelity.
-#
-# # Goals
-#
-# The aim of this theme is to only show you *relevant* information. Like most
-# prompts, it will only show git information when in a git working directory.
-# However, it goes a step further: everything from the current user and
-# hostname to whether the last call exited with an error to whether background
-# jobs are running in this shell will all be displayed automatically when
-# appropriate.
+# based on agnoster's theme - https://gist.github.com/3712874
 
 ### Segment drawing
 # A few utility functions to make it easy and re-usable to draw segmented prompts
 
 CURRENT_BG='NONE'
-SEGMENT_SEPARATOR='⮀'
+SEGMENT_SEPARATOR=''
 
 # Begin a segment
 # Takes two arguments, background and foreground. Both can be omitted,
@@ -62,7 +42,7 @@ prompt_end() {
 prompt_context() {
   local user=`whoami`
 
-  if [[ "$user" != "$DEFAULT_USER" || -n "$SSH_CLIENT" ]]; then
+  if [[ "$user" != "$USER" || -n "$SSH_CLIENT" ]]; then
     prompt_segment black default "%(!.%{%F{yellow}%}.)$user@%m"
   fi
 }
@@ -70,46 +50,67 @@ prompt_context() {
 # Git: branch/detached head, dirty status
 prompt_git() {
   local ref dirty
-  if $(git rev-parse --is-inside-work-tree >/dev/null 2>&1); then
-    ZSH_THEME_GIT_PROMPT_DIRTY='±'
-    dirty=$(parse_git_dirty)
-    ref=$(git symbolic-ref HEAD 2> /dev/null) || ref="➦ $(git show-ref --head -s --abbrev |head -n1 2> /dev/null)"
-    if [[ -n $dirty ]]; then
+  if $(git rev-parse --is-inside-work-tree 2> /dev/null); then
+    if [[ -n $(git status -s --ignore-submodules=dirty 2> /dev/null) ]]; then
       prompt_segment yellow black
     else
       prompt_segment green black
     fi
-    echo -n "${ref/refs\/heads\//⭠ }$dirty"
+
+    git diff --no-ext-diff --ignore-submodules --quiet --exit-code || dirty='∗'
+
+    ref=$(git symbolic-ref HEAD 2> /dev/null) || ref="➦ $(git show-ref --head -s --abbrev | head -n1 2> /dev/null)"
+
+    if git rev-parse --quiet --verify HEAD >/dev/null; then
+      git diff-index --cached --quiet --ignore-submodules HEAD -- || index='±'
+    else
+      index="#"
+    fi
+
+    if $(git status -b --porcelain | grep '\[ahead' &> /dev/null); then
+      push='↗'
+    fi
+
+    echo -n "${ref/refs\/heads\//}${dirty}${index}${push}"
   fi
 }
 
-# Dir: current working directory
 prompt_dir() {
   prompt_segment blue black '%~'
 }
 
-# Status:
-# - was there an error
-# - am I root
-# - are there background jobs?
 prompt_status() {
   local symbols
   symbols=()
-  [[ $RETVAL -ne 0 ]] && symbols+="%{%F{red}%}✘"
-  [[ $UID -eq 0 ]] && symbols+="%{%F{yellow}%}⚡"
   [[ $(jobs -l | wc -l) -gt 0 ]] && symbols+="%{%F{cyan}%}⚙"
 
   [[ -n "$symbols" ]] && prompt_segment black default "$symbols"
 }
 
-## Main prompt
-build_prompt() {
-  RETVAL=$?
-  prompt_status
-  prompt_context
-  prompt_dir
-  prompt_git
-  prompt_end
+prompt_vi_mode() {
+  [[ "$KEYMAP" == "vicmd" ]] && prompt_segment magenta default "❌"
 }
 
-PROMPT='%{%f%b%k%}$(build_prompt) '
+prompt_agnoster_setup () {
+  build_prompt() {
+    prompt_vi_mode
+    prompt_status
+    prompt_context
+    prompt_dir
+    prompt_git
+    prompt_end
+  }
+
+  function zle-keymap-select zle-line-init zle-line-finish {
+    zle reset-prompt
+    zle -R
+  }
+
+  zle -N zle-line-init
+  zle -N zle-line-finish
+  zle -N zle-keymap-select
+
+  PROMPT='%{%f%b%k%}$(build_prompt) '
+}
+
+prompt_agnoster_setup "$@"

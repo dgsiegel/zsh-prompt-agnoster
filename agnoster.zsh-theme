@@ -7,6 +7,9 @@
 
 CURRENT_BG='NONE'
 SEGMENT_SEPARATOR=''
+SSH_BG=green
+PRIMARY_FG=black
+
 
 # Begin a segment
 # Takes two arguments, background and foreground. Both can be omitted,
@@ -42,8 +45,8 @@ prompt_end() {
 prompt_context() {
   local user=`whoami`
 
-  if [[ "$user" != "$USER" || -n "$SSH_CLIENT" ]]; then
-    prompt_segment black default "%(!.%{%F{yellow}%}.)$user@%m"
+  if [[ "$user" != "$USER" || -n "$SSH_CONNECTION" ]]; then
+    prompt_segment $SSH_BG $PRIMARY_FG "%(!.%{%F{yellow}%}.)$user@%m"
   fi
 }
 
